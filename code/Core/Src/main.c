@@ -47,13 +47,15 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
 uint8_t eepromExampleWriteFlag = 0;
 uint8_t eepromExampleReadFlag = 0;
 uint8_t IOExpdrExampleWriteFlag = 0;
 uint8_t IOExpdrExampleReadFlag = 0;
 uint8_t eepromDataReadBack[4];
-uint8_t IOExpdrDataReadBack;
-uint8_t IOExpdrDataWrite = 0b01010101;
+uint8_t IOExpdrDataReadBack = 0;
+
+uint8_t ButtonState[2] = { 0 };
 
 /* USER CODE END PV */
 
@@ -63,6 +65,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
+
 void EEPROMWriteExample();
 void EEPROMReadExample(uint8_t *Rdata, uint16_t len);
 
@@ -115,11 +118,20 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
+		//Read User Button (B1)
+//		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13));
+		ButtonState[0] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+
 		EEPROMWriteExample();
 		EEPROMReadExample(eepromDataReadBack, 4);
 
-		IOExpenderReadPinA(&IOExpdrDataReadBack);
-		IOExpenderWritePinB(IOExpdrDataWrite);
+		if (ButtonState[0]==GPIO_PIN_RESET && ButtonState[1]==GPIO_PIN_SET)
+		{
+			IOExpenderReadPinA(&IOExpdrDataReadBack);
+			HAL_Delay(10);
+			IOExpenderWritePinB(IOExpdrDataReadBack);
+		}
+		ButtonState[1] = ButtonState[0];
 
     /* USER CODE END WHILE */
 
@@ -255,7 +267,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_10, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -263,12 +275,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin PA10 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_10;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
@@ -279,9 +291,6 @@ void EEPROMWriteExample() {
 		static uint8_t data[4] = { 0xff, 0x00, 0x55, 0xaa };
 		HAL_I2C_Mem_Write_IT(&hi2c1, EEPROM_ADDR, 0x2C, I2C_MEMADD_SIZE_16BIT,
 				data, 4);
-
-
-
 		eepromExampleWriteFlag = 0;
 	}
 }
@@ -302,19 +311,19 @@ void IOExpenderInit() {
 			0x16, 100);
 }
 void IOExpenderReadPinA(uint8_t *Rdata) {
-	if (IOExpdrExampleReadFlag && hi2c1.State == HAL_I2C_STATE_READY) {
+	if (hi2c1.State == HAL_I2C_STATE_READY) {
 		HAL_I2C_Mem_Read_IT(&hi2c1, IOEXPD_ADDR, 0x12, I2C_MEMADD_SIZE_8BIT,
 				Rdata, 1);
-		IOExpdrExampleReadFlag =0;
+		IOExpdrExampleReadFlag = 0;
 	}
 }
 void IOExpenderWritePinB(uint8_t Wdata) {
-	if (IOExpdrExampleWriteFlag && hi2c1.State == HAL_I2C_STATE_READY) {
+	if (hi2c1.State == HAL_I2C_STATE_READY) {
 		static uint8_t data;
 		data = Wdata;
 		HAL_I2C_Mem_Write_IT(&hi2c1, IOEXPD_ADDR, 0x15, I2C_MEMADD_SIZE_8BIT,
 				&data, 1);
-		IOExpdrExampleWriteFlag=0;
+		IOExpdrExampleWriteFlag = 0;
 	}
 }
 /* USER CODE END 4 */
